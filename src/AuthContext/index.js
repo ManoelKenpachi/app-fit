@@ -10,13 +10,21 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await api.post("/auth/login", { email, password });
+      console.log("🔹 Token recebido do backend:", response.data.token); // 🔥 Verifique se o token está correto
+  
+      if (!response.data.token) {
+        console.error("❌ Nenhum token retornado do backend!");
+        return;
+      }
+  
       await AsyncStorage.setItem("token", response.data.token);
       setUser(response.data.userId);
     } catch (error) {
-      console.error("Erro no login:", error.response ? error.response.data : error.message);
-      throw new Error("Credenciais inválidas.");
+      console.error("❌ Erro no login:", error.response ? error.response.data : error.message);
+      Alert.alert("Erro", "Credenciais inválidas.");
     }
   };
+  
 
   const logout = async () => {
     await AsyncStorage.removeItem("token");

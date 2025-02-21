@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { View, Text, FlatList, ActivityIndicator, Button } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthContext } from "../AuthContext";
 import { api } from "../api";
 import { styles } from "./styles";
@@ -12,14 +13,28 @@ const WorkoutScreen = ({ navigation }) => {
   useEffect(() => {
     const fetchWorkout = async () => {
       try {
-        const response = await api.get("/api/workout-today");
+        const token = await AsyncStorage.getItem("token");
+        console.log("Token JWT armazenado:", token); // 🔥 Verifique se o token foi salvo corretamente
+    
+        if (!token) {
+          console.error("❌ Token não encontrado no AsyncStorage!");
+          return;
+        }
+    
+        const response = await api.get("/api/workout-today", {
+          headers: {
+            Authorization: `Bearer ${token}`, // 🔥 O token precisa estar aqui
+          },
+        });
+    
         setWorkout(response.data);
       } catch (error) {
-        console.error("Erro ao buscar treino:", error);
+        console.error("❌ Erro ao buscar treino:", error.response ? error.response.data : error.message);
       } finally {
         setLoading(false);
       }
     };
+      
 
     fetchWorkout();
   }, []);

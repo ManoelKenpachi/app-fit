@@ -2,7 +2,6 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// 📌 Criar um novo treino
 export const createWorkout = async (req, res) => {
   const { name, day } = req.body;
   const userId = req.userId; // Obtém o ID do usuário autenticado
@@ -18,7 +17,6 @@ export const createWorkout = async (req, res) => {
   }
 };
 
-// 📌 Listar todos os treinos do usuário autenticado
 export const getWorkouts = async (req, res) => {
   const userId = req.userId;
 
@@ -34,11 +32,16 @@ export const getWorkouts = async (req, res) => {
   }
 };
 
-// 📌 Obter o treino do dia baseado no dia da semana
 export const getWorkoutOfTheDay = async (req, res) => {
   const userId = req.userId;
+  console.log("ID do usuário autenticado:", userId); // 🔥 Debug
+
+  if (!userId) {
+    return res.status(401).json({ error: "Usuário não autenticado." });
+  }
+
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const today = daysOfWeek[new Date().getDay()]; // Obtém o dia da semana atual
+  const today = daysOfWeek[new Date().getDay()];
 
   try {
     const workout = await prisma.workout.findFirst({
@@ -52,7 +55,6 @@ export const getWorkoutOfTheDay = async (req, res) => {
   }
 };
 
-// 📌 Excluir um treino
 export const deleteWorkout = async (req, res) => {
   const { id } = req.params;
 
