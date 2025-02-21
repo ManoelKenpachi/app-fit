@@ -1,0 +1,29 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int       @id @default(autoincrement())
+  name     String
+  email    String    @unique
+  password String
+  workouts Workout[]
+}
+
+model Workout {
+  id       Int       @id @default(autoincrement())
+  name     String
+  day      String?
+  userId   Int
+  user     User      @relation(fields: [userId], references: [id])
+  exercises Exercise[]
+}
+
+model Exercise {
+  id        Int       @id @default(autoincrement())
+  name      String
+  sets      Int
+  workoutId Int
+  workout   Workout   @relation(fields: [workoutId], references: [id])
+}
