@@ -9,18 +9,15 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      console.log("Enviando para API:", { email, password }); // 🔥 Debug para ver o que está sendo enviado
       const response = await api.post("/auth/login", { email, password });
-      console.log("Resposta da API:", response.data);
       await AsyncStorage.setItem("token", response.data.token);
       setUser(response.data.userId);
     } catch (error) {
       console.error("Erro no login:", error.response ? error.response.data : error.message);
-      Alert.alert("Erro", "Credenciais inválidas.");
+      throw new Error("Credenciais inválidas.");
     }
   };
-  
-  
+
   const logout = async () => {
     await AsyncStorage.removeItem("token");
     setUser(null);
