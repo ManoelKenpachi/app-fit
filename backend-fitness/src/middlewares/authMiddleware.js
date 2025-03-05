@@ -1,24 +1,50 @@
 import jwt from "jsonwebtoken";
+import { config } from '../config/config.js';
+import { AppError } from './errorHandler.js';
+import { PrismaClient } from '@prisma/client';
 
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.header("Authorization");
+const prisma = new PrismaClient();
 
-  if (!authHeader) {
-    return res.status(401).json({ error: "Acesso negado. Nenhum token fornecido." });
-  }
-
-  const token = authHeader.split(" ")[1]; // Remove "Bearer " do token
-
-  if (!token) {
-    return res.status(401).json({ error: "Token inválido." });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ error: "Token inválido ou expirado." });
+export const protect = async (req, res, next) => {
+  try {
+    // 1) Verificar se o token existe
+    let token;
+    if (req.headers.authorization?.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
     }
 
-    req.userId = decoded.userId; // 🔥 Define req.userId corretamente
+    if (!token) {
+      throw new AppError('Você não está logado! Por favor, faça login para ter acesso.', 401);
+    }
+
+    // 2) Verificar se o token é válido
+    const decoded = jwt.verify(token, config.jwtSecret);
+
+    // 3) Verificar se o usuário ainda existe
+    const currentUser = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    });
+
+    if (!currentUser) {
+      throw new AppError('O usuário deste token não existe mais.', 401);
+    }
+
+    // 4) Verificar se o usuário mudou a senha após o token ser emitido
+    if (currentUser.passwordChangedAt) {
+      const changedTimestamp = parseInt(
+        currentUser.passwordChangedAt.getTime() / 1000,
+        10
+      );
+
+      if (decoded.iat < changedTimestamp) {
+        throw new AppError('Usuário mudou a senha recentemente! Por favor, faça login novamente.', 401);
+      }
+    }
+
+    // Guardar o usuário na requisição para uso futuro
+    req.user = currentUser;
     next();
-  });
+  } catch (error) {
+    next(error);
+  }
 };
