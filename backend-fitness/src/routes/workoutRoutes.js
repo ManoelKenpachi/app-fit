@@ -1,19 +1,15 @@
 import express from "express";
-import { authenticateToken } from "../middlewares/authMiddleware.js";
-import { createWorkout, getWorkouts, getWorkoutOfTheDay, deleteWorkout } from "../controllers/workoutController.js";
+import { protect } from "../middlewares/authMiddleware.js";
+import { createWorkout, getWorkouts, getWorkoutOfTheDay, deleteWorkout, updateWorkout } from "../controllers/workoutController.js";
 
 const router = express.Router();
 
-// 📌 Criar um treino
-router.post("/workouts", authenticateToken, createWorkout);
-
-// 📌 Listar todos os treinos do usuário
-router.get("/workouts", authenticateToken, getWorkouts);
-
-// 📌 Obter o treino do dia com base no dia da semana
-router.get("/workout-today", authenticateToken, getWorkoutOfTheDay);
-
-// 📌 Excluir um treino pelo ID
-router.delete("/workouts/:id", authenticateToken, deleteWorkout);
+// Rotas protegidas
+router.use(protect);
+router.post("/", createWorkout);
+router.get("/", getWorkouts);
+router.get("/workout-today", getWorkoutOfTheDay);
+router.delete("/:id", deleteWorkout);
+router.put("/:id", updateWorkout);
 
 export default router;
