@@ -34,11 +34,20 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     width: "100%",
+    marginBottom: 15,
   },
   buttonText: {
     color: "#121212",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  linkButton: {
+    padding: 10,
+  },
+  linkText: {
+    color: "#BB86FC",
+    fontSize: 16,
+    textDecorationLine: "underline",
   },
   exerciseCard: {
     backgroundColor: "#1E1E1E",
