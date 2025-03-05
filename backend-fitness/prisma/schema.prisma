@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -16,11 +16,11 @@ model User {
 }
 
 model Workout {
-  id       Int       @id @default(autoincrement())
-  name     String
-  day      String?
-  userId   Int
-  user     User      @relation(fields: [userId], references: [id])
+  id        Int        @id @default(autoincrement())
+  name      String
+  day       String?
+  userId    Int
+  user      User       @relation(fields: [userId], references: [id])
   exercises Exercise[]
 }
 
@@ -28,6 +28,7 @@ model Exercise {
   id        Int       @id @default(autoincrement())
   name      String
   sets      Int
+  reps      Int?
   workoutId Int
-  workout   Workout   @relation(fields: [workoutId], references: [id])
+  workout   Workout   @relation(fields: [workoutId], references: [id], onDelete: Cascade)
 }
