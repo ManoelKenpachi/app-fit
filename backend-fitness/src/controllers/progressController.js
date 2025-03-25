@@ -3,33 +3,91 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // 📌 Registrar progresso de um exercício
-export const logProgress = async (req, res) => {
-  const { exerciseId, setsDone, weight, reps } = req.body;
+export const registerProgress = async (req, res) => {
+  const { exerciseId, weight, reps, set } = req.body;
+  const userId = req.user.id;
 
   try {
-    const progress = await prisma.progress.create({
-      data: { exerciseId, setsDone, weight, reps },
+    // Verificar se o exercício pertence a um treino do usuário
+    const exercise = await prisma.exercise.findUnique({
+      where: { id: parseInt(exerciseId) },
+      include: {
+        workout: true
+      }
     });
 
-    res.status(201).json(progress);
-  } catch (error) {
-    res.status(400).json({ error: "Erro ao registrar progresso." });
-  }
-};
+    if (!exercise) {
+      return res.status(404).json({ error: "Exercício não encontrado" });
+    }
 
-// 📌 Listar progresso de um exercício específico
-export const getProgressByExercise = async (req, res) => {
-  const { exerciseId } = req.params;
+    if (exercise.workout.userId !== userId) {
+      return res.status(403).json({ error: "Não autorizado" });
+    }
 
-  try {
-    const progress = await prisma.progress.findMany({
-      where: { exerciseId: parseInt(exerciseId) },
-      orderBy: { date: "desc" }, // Ordena do mais recente para o mais antigo
+    // Buscar o último peso registrado para este exercício (primeira série do dia)
+    const lastProgress = await prisma.progress.findFirst({
+      where: {
+        exerciseId: parseInt(exerciseId),
+        date: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)) // Início do dia atual
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+
+    // Se não foi fornecido um peso e existe um registro anterior, usar o mesmo peso
+    const weightToUse = weight || (lastProgress ? lastProgress.weight : exercise.targetWeight || 0);
+
+    const progress = await prisma.progress.create({
+      data: {
+        exerciseId: parseInt(exerciseId),
+        weight: weightToUse,
+        reps: parseInt(reps),
+        set: parseInt(set),
+        completed: true
+      }
     });
 
     res.json(progress);
   } catch (error) {
-    res.status(500).json({ error: "Erro ao buscar progresso do exercício." });
+    console.error("Erro ao registrar progresso:", error);
+    res.status(500).json({ error: "Erro ao registrar progresso" });
+  }
+};
+
+// 📌 Listar progresso de um exercício específico
+export const getExerciseProgress = async (req, res) => {
+  const { exerciseId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    // Verificar se o exercício pertence a um treino do usuário
+    const exercise = await prisma.exercise.findUnique({
+      where: { id: parseInt(exerciseId) },
+      include: {
+        workout: true,
+        progress: {
+          orderBy: {
+            date: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!exercise) {
+      return res.status(404).json({ error: "Exercício não encontrado" });
+    }
+
+    if (exercise.workout.userId !== userId) {
+      return res.status(403).json({ error: "Não autorizado" });
+    }
+
+    res.json(exercise.progress);
+  } catch (error) {
+    console.error("Erro ao buscar progresso:", error);
+    res.status(500).json({ error: "Erro ao buscar progresso" });
   }
 };
 

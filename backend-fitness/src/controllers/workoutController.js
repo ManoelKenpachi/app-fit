@@ -16,7 +16,8 @@ export const createWorkout = async (req, res) => {
           create: exercises.map(exercise => ({
             name: exercise.name,
             sets: parseInt(exercise.sets),
-            reps: parseInt(exercise.reps)
+            reps: parseInt(exercise.reps),
+            targetWeight: exercise.targetWeight ? parseFloat(exercise.targetWeight) : 0
           }))
         }
       },
@@ -38,58 +39,108 @@ export const createWorkout = async (req, res) => {
 };
 
 export const getWorkouts = async (req, res) => {
-  const userId = req.user.id; // Corrigido: usando req.user.id
-
   try {
+    const userId = req.user.id;
     const workouts = await prisma.workout.findMany({
-      where: { userId },
-      include: { exercises: true },
+      where: {
+        userId: userId,
+        isActive: true
+      },
+      include: {
+        exercises: {
+          where: {
+            isActive: true
+          }
+        }
+      }
     });
-
     res.json(workouts);
   } catch (error) {
-    console.error("Erro ao buscar treinos:", error);
-    res.status(500).json({ error: "Erro ao buscar treinos." });
+    console.error('Erro ao buscar treinos:', error);
+    res.status(500).json({ error: 'Erro ao buscar treinos' });
+  }
+};
+
+export const getWorkoutHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const workouts = await prisma.workout.findMany({
+      where: {
+        userId: userId,
+      },
+      include: {
+        exercises: {
+          include: {
+            progress: {
+              orderBy: {
+                date: 'desc'
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        id: 'desc'
+      }
+    });
+
+    // Formatar os dados para facilitar a visualização do progresso
+    const formattedWorkouts = workouts.map(workout => ({
+      ...workout,
+      exercises: workout.exercises.map(exercise => ({
+        ...exercise,
+        progressHistory: exercise.progress.reduce((acc, curr) => {
+          const date = curr.date.toISOString().split('T')[0];
+          if (!acc[date]) {
+            acc[date] = [];
+          }
+          acc[date].push({
+            weight: curr.weight,
+            reps: curr.reps,
+            set: curr.set
+          });
+          return acc;
+        }, {})
+      }))
+    }));
+
+    res.json(formattedWorkouts);
+  } catch (error) {
+    console.error('Erro ao buscar histórico de treinos:', error);
+    res.status(500).json({ error: 'Erro ao buscar histórico de treinos' });
   }
 };
 
 export const getWorkoutOfTheDay = async (req, res) => {
-  const userId = req.user.id; // Corrigido: usando req.user.id
-  console.log("ID do usuário autenticado:", userId);
-
-  if (!userId) {
-    return res.status(401).json({ error: "Usuário não autenticado." });
-  }
-
-  const daysOfWeek = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-  const today = daysOfWeek[new Date().getDay()];
-  console.log("Dia atual:", today);
-
   try {
+    const userId = req.user.id;
+    const today = new Date();
+    const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const currentDay = weekdays[today.getDay()];
+
+    console.log('ID do usuário autenticado:', userId);
+    console.log('Dia atual:', currentDay);
+
     const workout = await prisma.workout.findFirst({
-      where: { 
-        userId,
-        day: today 
+      where: {
+        userId: userId,
+        day: currentDay,
+        isActive: true
       },
-      include: { 
-        exercises: true 
-      },
+      include: {
+        exercises: {
+          where: {
+            isActive: true
+          }
+        }
+      }
     });
 
-    console.log("Treino encontrado:", workout);
-
-    if (!workout) {
-      return res.json({ 
-        name: "Descanso",
-        exercises: [],
-        message: "Nenhum treino planejado para hoje." 
-      });
-    }
-
+    console.log('Treino encontrado:', workout);
     res.json(workout);
   } catch (error) {
-    console.error("Erro ao buscar treino do dia:", error);
-    res.status(500).json({ error: "Erro ao buscar treino do dia." });
+    console.error('Erro ao buscar treino do dia:', error);
+    res.status(500).json({ error: 'Erro ao buscar treino do dia' });
   }
 };
 
@@ -175,7 +226,8 @@ export const updateWorkout = async (req, res) => {
           create: exercises.map(exercise => ({
             name: exercise.name,
             sets: parseInt(exercise.sets),
-            reps: parseInt(exercise.reps)
+            reps: parseInt(exercise.reps),
+            targetWeight: exercise.targetWeight ? parseFloat(exercise.targetWeight) : 0
           }))
         }
       }
