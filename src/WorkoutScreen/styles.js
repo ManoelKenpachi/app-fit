@@ -9,24 +9,28 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    padding: 20,
     paddingTop: 40,
-    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
     backgroundColor: '#1E1E1E',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#BB86FC",
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#BB86FC',
   },
-  logoutButton: {
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
     padding: 8,
+    marginLeft: 16,
   },
   contentContainer: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 16,
+    padding: 20,
   },
   content: {
     flex: 1,
@@ -38,50 +42,41 @@ export const styles = StyleSheet.create({
     marginBottom: 24,
   },
   workoutName: {
-    fontSize: 20,
-    color: "#E1E1E1",
-    flex: 1,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   editButton: {
     padding: 8,
-    marginLeft: 16,
   },
-  exerciseCard: {
-    backgroundColor: "#1E1E1E",
-    borderRadius: 12,
+  startButton: {
+    backgroundColor: "#BB86FC",
     padding: 16,
-    marginBottom: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 24,
   },
-  exerciseName: {
+  startButtonText: {
+    color: "#000",
     fontSize: 18,
-    fontWeight: "600",
-    color: "#E1E1E1",
+    fontWeight: "bold",
+  },
+  noWorkoutText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    textAlign: 'center',
     marginBottom: 8,
-  },
-  exerciseDetails: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  exerciseInfo: {
-    fontSize: 16,
-    color: "#BB86FC",
   },
   emptyContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 32,
-  },
-  noWorkout: {
-    fontSize: 18,
-    color: "#E1E1E1",
-    textAlign: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   emptySubtitle: {
+    color: '#666',
     fontSize: 14,
-    color: "#666",
-    marginTop: 8,
-    textAlign: "center",
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -93,6 +88,65 @@ export const styles = StyleSheet.create({
     color: "#BB86FC",
     marginTop: 16,
     fontSize: 16,
+  },
+  exerciseContainer: {
+    padding: 20,
+  },
+  exerciseName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 10,
+  },
+  setInfo: {
+    fontSize: 16,
+    color: '#BB86FC',
+    marginBottom: 20,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#2C2C2C',
+    borderRadius: 8,
+    padding: 15,
+    color: '#FFFFFF',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#BB86FC',
+  },
+  registerButton: {
+    backgroundColor: '#BB86FC',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  registerButtonText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  exerciseCard: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  exerciseDetails: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  exerciseInfo: {
+    fontSize: 16,
+    color: "#BB86FC",
   },
   fab: {
     position: 'absolute',

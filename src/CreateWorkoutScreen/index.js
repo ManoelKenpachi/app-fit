@@ -34,7 +34,8 @@ const CreateWorkoutScreen = ({ route }) => {
     workoutToEdit?.exercises.map(ex => ({
       name: ex.name,
       sets: ex.sets.toString(),
-      reps: ex.reps ? ex.reps.toString() : ''
+      reps: ex.reps ? ex.reps.toString() : '',
+      targetWeight: ex.targetWeight ? ex.targetWeight.toString() : ''
     })) || []
   );
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -44,8 +45,13 @@ const CreateWorkoutScreen = ({ route }) => {
   const [currentExercise, setCurrentExercise] = useState({
     name: '',
     sets: '',
-    reps: ''
+    reps: '',
+    targetWeight: ''
   });
+  const [exerciseName, setExerciseName] = useState('');
+  const [sets, setSets] = useState('');
+  const [reps, setReps] = useState('');
+  const [targetWeight, setTargetWeight] = useState('');
 
   const fetchWorkoutsForDay = async (day) => {
     try {
@@ -77,13 +83,23 @@ const CreateWorkoutScreen = ({ route }) => {
   };
 
   const handleAddExercise = () => {
-    if (!currentExercise.name || !currentExercise.sets || !currentExercise.reps) {
-      Alert.alert('Erro', 'Por favor, preencha todos os campos do exercício');
+    if (!exerciseName || !sets || !reps) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos');
       return;
     }
 
-    setExercises([...exercises, currentExercise]);
-    setCurrentExercise({ name: '', sets: '', reps: '' });
+    const newExercise = {
+      name: exerciseName,
+      sets: parseInt(sets),
+      reps: parseInt(reps),
+      targetWeight: targetWeight ? parseFloat(targetWeight) : 0
+    };
+
+    setExercises([...exercises, newExercise]);
+    setExerciseName('');
+    setSets('');
+    setReps('');
+    setTargetWeight('');
     setShowExerciseModal(false);
   };
 
@@ -93,71 +109,36 @@ const CreateWorkoutScreen = ({ route }) => {
   };
 
   const handleSaveWorkout = async () => {
-    if (!workoutName || !workoutDay) {
-      Alert.alert('Erro', 'Por favor, preencha o nome do treino e selecione um dia');
-      return;
-    }
-
-    if (exercises.length === 0) {
-      Alert.alert(
-        'Atenção',
-        'Você está tentando salvar um treino sem exercícios. Deseja continuar?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Continuar', 
-            onPress: async () => {
-              try {
-                if (workoutToEdit) {
-                  await api.put(`/api/workouts/${workoutToEdit.id}`, {
-                    name: workoutName,
-                    day: workoutDay,
-                    exercises: exercises
-                  });
-                  Alert.alert('Sucesso', 'Treino atualizado com sucesso!');
-                } else {
-                  await api.post('/api/workouts', {
-                    name: workoutName,
-                    day: workoutDay,
-                    exercises: exercises
-                  });
-                  Alert.alert('Sucesso', 'Treino criado com sucesso!');
-                }
-                await fetchWorkoutsForDay(workoutDay);
-                navigation.goBack();
-              } catch (error) {
-                Alert.alert('Erro', workoutToEdit ? 'Erro ao atualizar treino.' : 'Erro ao criar treino.');
-                console.error(error);
-              }
-            }
-          }
-        ]
-      );
+    if (!workoutName || !workoutDay || exercises.length === 0) {
+      Alert.alert('Erro', 'Por favor, preencha o nome do treino, selecione um dia e adicione pelo menos um exercício');
       return;
     }
 
     try {
+      const workoutData = {
+        name: workoutName,
+        day: workoutDay,
+        exercises: exercises.map(exercise => ({
+          name: exercise.name,
+          sets: parseInt(exercise.sets),
+          reps: parseInt(exercise.reps),
+          targetWeight: parseFloat(exercise.targetWeight) || 0
+        }))
+      };
+
       if (workoutToEdit) {
-        await api.put(`/api/workouts/${workoutToEdit.id}`, {
-          name: workoutName,
-          day: workoutDay,
-          exercises: exercises
-        });
+        await api.put(`/api/workouts/${workoutToEdit.id}`, workoutData);
         Alert.alert('Sucesso', 'Treino atualizado com sucesso!');
       } else {
-        await api.post('/api/workouts', {
-          name: workoutName,
-          day: workoutDay,
-          exercises: exercises
-        });
+        await api.post('/api/workouts', workoutData);
         Alert.alert('Sucesso', 'Treino criado com sucesso!');
       }
 
       await fetchWorkoutsForDay(workoutDay);
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Erro', workoutToEdit ? 'Erro ao atualizar treino.' : 'Erro ao criar treino.');
-      console.error(error);
+      console.error('Erro ao salvar treino:', error);
+      Alert.alert('Erro', 'Não foi possível salvar o treino. Tente novamente.');
     }
   };
 
@@ -178,7 +159,8 @@ const CreateWorkoutScreen = ({ route }) => {
     setExercises(workout.exercises.map(ex => ({
       name: ex.name,
       sets: ex.sets.toString(),
-      reps: ex.reps ? ex.reps.toString() : ''
+      reps: ex.reps ? ex.reps.toString() : '',
+      targetWeight: ex.targetWeight ? ex.targetWeight.toString() : ''
     })));
     // Define o treino atual como o treino sendo editado
     route.params = { workoutToEdit: workout };
@@ -292,18 +274,22 @@ const CreateWorkoutScreen = ({ route }) => {
         </View>
 
         {exercises.map((exercise, index) => (
-          <View key={index} style={styles.exerciseCard}>
+          <View key={index} style={styles.exerciseItem}>
             <View style={styles.exerciseInfo}>
               <Text style={styles.exerciseName}>{exercise.name}</Text>
               <Text style={styles.exerciseDetails}>
                 {exercise.sets} séries x {exercise.reps} reps
+                {exercise.targetWeight > 0 ? ` • ${exercise.targetWeight}kg` : ''}
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => handleRemoveExercise(index)}
-              style={styles.removeExerciseButton}
+              style={styles.deleteButton}
+              onPress={() => {
+                const newExercises = exercises.filter((_, i) => i !== index);
+                setExercises(newExercises);
+              }}
             >
-              <Ionicons name="trash-outline" size={20} color="#FF4444" />
+              <Ionicons name="trash" size={24} color="#FF6B6B" />
             </TouchableOpacity>
           </View>
         ))}
@@ -360,55 +346,64 @@ const CreateWorkoutScreen = ({ route }) => {
 
       <Modal
         visible={showExerciseModal}
-        transparent
+        transparent={true}
         animationType="slide"
+        onRequestClose={() => setShowExerciseModal(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Adicionar Exercício</Text>
             
             <TextInput
-              style={styles.modalInput}
+              style={styles.input}
               placeholder="Nome do Exercício"
-              placeholderTextColor="#666"
-              value={currentExercise.name}
-              onChangeText={(text) => setCurrentExercise({...currentExercise, name: text})}
+              value={exerciseName}
+              onChangeText={setExerciseName}
             />
-
+            
             <TextInput
-              style={styles.modalInput}
+              style={styles.input}
               placeholder="Número de Séries"
-              placeholderTextColor="#666"
+              value={sets}
+              onChangeText={setSets}
               keyboardType="numeric"
-              value={currentExercise.sets}
-              onChangeText={(text) => setCurrentExercise({...currentExercise, sets: text})}
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Repetições por Série"
+              value={reps}
+              onChangeText={setReps}
+              keyboardType="numeric"
             />
 
             <TextInput
-              style={styles.modalInput}
-              placeholder="Repetições por Série"
-              placeholderTextColor="#666"
+              style={styles.input}
+              placeholder="Peso (kg)"
+              value={targetWeight}
+              onChangeText={setTargetWeight}
               keyboardType="numeric"
-              value={currentExercise.reps}
-              onChangeText={(text) => setCurrentExercise({...currentExercise, reps: text})}
             />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
+                style={styles.cancelButton} 
                 onPress={() => {
-                  setCurrentExercise({ name: '', sets: '', reps: '' });
                   setShowExerciseModal(false);
+                  setExerciseName('');
+                  setSets('');
+                  setReps('');
+                  setTargetWeight('');
                 }}
               >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
+                <Text style={styles.buttonText}>Cancelar</Text>
               </TouchableOpacity>
-
+              
               <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]}
+                style={styles.addButton} 
                 onPress={handleAddExercise}
               >
-                <Text style={styles.modalButtonText}>Adicionar</Text>
+                <Text style={styles.buttonText}>Adicionar</Text>
               </TouchableOpacity>
             </View>
           </View>

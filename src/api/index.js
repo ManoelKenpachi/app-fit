@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Configuração base do axios
 export const api = axios.create({
-  baseURL: "http://localhost:4000", // Usando localhost ao invés do IP específico
+  baseURL: "http://192.168.101.151:4000", // Usando IP da máquina para acesso via web e mobile
   timeout: 10000, // Timeout de 10 segundos
   headers: {
     'Content-Type': 'application/json',
@@ -18,6 +18,9 @@ api.interceptors.request.use(
       const token = await AsyncStorage.getItem("token");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log("Token adicionado à requisição:", token);
+      } else {
+        console.warn("Token não encontrado no AsyncStorage");
       }
       return config;
     } catch (error) {

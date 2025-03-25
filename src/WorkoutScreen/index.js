@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useContext } from "react";
-import { View, Text, FlatList, ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, Alert } from "react-native";
+import React, { useState, useContext } from "react";
+import { View, Text, ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthContext } from "../AuthContext";
 import { api } from "../api";
 import { styles } from "./styles";
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import ExerciseProgress from "../components/ExerciseProgress";
 
 const WorkoutScreen = () => {
   const navigation = useNavigation();
@@ -13,6 +14,7 @@ const WorkoutScreen = () => {
   const [workout, setWorkout] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
 
   const fetchWorkout = async () => {
     try {
@@ -24,7 +26,6 @@ const WorkoutScreen = () => {
       }
 
       const response = await api.get("/api/workouts/workout-today");
-      console.log("Resposta do servidor:", response.data);
       setWorkout(response.data);
     } catch (error) {
       console.error("❌ Erro ao buscar treino:", error.response ? error.response.data : error.message);
@@ -61,41 +62,35 @@ const WorkoutScreen = () => {
       await AsyncStorage.removeItem("token");
       await AsyncStorage.clear();
       logout();
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'LoginScreen' }]
-      });
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
       Alert.alert("Erro", "Não foi possível fazer logout. Tente novamente.");
     }
   };
 
-  const handleDeleteWorkout = async () => {
-    if (!workout || !workout.id) return;
-
-    Alert.alert(
-      "Confirmar exclusão",
-      "Tem certeza que deseja excluir este treino?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.delete(`/api/workouts/${workout.id}`);
-              Alert.alert("Sucesso", "Treino excluído com sucesso!");
-              fetchWorkout();
-            } catch (error) {
-              console.error("Erro ao excluir treino:", error);
-              Alert.alert("Erro", "Não foi possível excluir o treino. Tente novamente.");
-            }
-          }
-        }
-      ]
-    );
+  const handleStartWorkout = () => {
+    setShowProgress(true);
   };
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Text style={styles.headerTitle}>Treino do Dia</Text>
+      <View style={styles.headerButtons}>
+        <TouchableOpacity 
+          style={styles.headerButton} 
+          onPress={handleAddWorkout}
+        >
+          <Ionicons name="add-outline" size={24} color="#BB86FC" />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.headerButton} 
+          onPress={handleLogout}
+        >
+          <Ionicons name="log-out-outline" size={24} color="#BB86FC" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -106,78 +101,84 @@ const WorkoutScreen = () => {
     );
   }
 
-  const renderExerciseItem = ({ item }) => (
-    <View style={styles.exerciseCard}>
-      <Text style={styles.exerciseName}>{item.name}</Text>
-      <View style={styles.exerciseDetails}>
-        <Text style={styles.exerciseInfo}>Séries: {item.sets}</Text>
-        {item.reps && (
-          <Text style={styles.exerciseInfo}>Reps: {item.reps}</Text>
-        )}
+  if (!workout) {
+    return (
+      <View style={styles.container}>
+        {renderHeader()}
+        <View style={styles.emptyContainer}>
+          <Text style={styles.noWorkoutText}>Nenhum treino programado para hoje</Text>
+          <Text style={styles.emptySubtitle}>Clique no + para adicionar um treino</Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Treino do Dia</Text>
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out-outline" size={24} color="#BB86FC" />
-        </TouchableOpacity>
-      </View>
-
+      {renderHeader()}
       <ScrollView 
         contentContainerStyle={styles.contentContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {workout ? (
-          <View style={styles.content}>
-            <View style={styles.workoutHeader}>
-              <Text style={styles.workoutName}>{workout.name}</Text>
-              {workout.id && (
-                <TouchableOpacity 
-                  style={styles.editButton}
-                  onPress={handleEditWorkout}
-                >
-                  <Ionicons name="create-outline" size={24} color="#BB86FC" />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {workout.exercises && workout.exercises.length > 0 ? (
-              <FlatList
-                data={workout.exercises}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={renderExerciseItem}
-                scrollEnabled={false}
-              />
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.noWorkout}>{workout.message || "Nenhum exercício para hoje."}</Text>
-                <Text style={styles.emptySubtitle}>Puxe para baixo para atualizar</Text>
-              </View>
+        <View style={styles.content}>
+          <View style={styles.workoutHeader}>
+            <Text style={styles.workoutName}>{workout.name}</Text>
+            {workout.id && (
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={handleEditWorkout}
+              >
+                <Ionicons name="create-outline" size={24} color="#BB86FC" />
+              </TouchableOpacity>
             )}
           </View>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.noWorkout}>Erro ao carregar o treino</Text>
-            <Text style={styles.emptySubtitle}>Puxe para baixo para tentar novamente</Text>
-          </View>
-        )}
+
+          {!showProgress ? (
+            <>
+              {workout.exercises.map((exercise) => (
+                <View key={exercise.id} style={styles.exerciseCard}>
+                  <Text style={styles.exerciseName}>{exercise.name}</Text>
+                  <View style={styles.exerciseDetails}>
+                    <Text style={styles.exerciseInfo}>
+                      {exercise.sets} séries x {exercise.reps} reps
+                    </Text>
+                    {exercise.targetWeight && (
+                      <Text style={styles.exerciseInfo}>
+                        Meta: {exercise.targetWeight}kg
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity 
+                style={styles.startButton}
+                onPress={handleStartWorkout}
+              >
+                <Text style={styles.startButtonText}>Iniciar Treino</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {workout.exercises.map((exercise) => (
+                <ExerciseProgress 
+                  key={exercise.id} 
+                  exercise={exercise}
+                  onComplete={() => {
+                    if (exercise === workout.exercises[workout.exercises.length - 1]) {
+                      Alert.alert(
+                        "Parabéns!",
+                        "Você completou o treino de hoje!"
+                      );
+                    }
+                  }}
+                />
+              ))}
+            </>
+          )}
+        </View>
       </ScrollView>
-      
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={handleAddWorkout}
-      >
-        <Ionicons name="add" size={30} color="#121212" />
-      </TouchableOpacity>
     </View>
   );
 };

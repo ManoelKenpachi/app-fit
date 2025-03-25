@@ -113,26 +113,29 @@ export const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 20,
+    gap: 10,
   },
-  modalButton: {
+  cancelButton: {
     flex: 1,
-    padding: 12,
+    backgroundColor: '#2C2C2C',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BB86FC',
+  },
+  addButton: {
+    flex: 1,
+    backgroundColor: '#BB86FC',
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#333333',
-    marginRight: 8,
-  },
-  confirmButton: {
-    backgroundColor: '#BB86FC',
-    marginLeft: 8,
-  },
-  modalButtonText: {
+  buttonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   inputText: {
     color: '#FFFFFF',
