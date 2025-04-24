@@ -4,15 +4,25 @@ const prisma = new PrismaClient();
 
 // 📌 Criar um exercício e vinculá-lo a um treino
 export const createExercise = async (req, res) => {
-  const { name, sets, workoutId } = req.body;
+  const { name, sets, reps, targetWeight, workoutId } = req.body;
 
   try {
+    console.log('Criando exercício:', { name, sets, reps, targetWeight, workoutId });
+    
     const exercise = await prisma.exercise.create({
-      data: { name, sets, workoutId },
+      data: { 
+        name, 
+        sets, 
+        reps: parseInt(reps) || 0,
+        targetWeight: targetWeight ? parseFloat(targetWeight) : null,
+        workoutId: parseInt(workoutId)
+      },
     });
 
+    console.log('Exercício criado:', exercise);
     res.status(201).json(exercise);
   } catch (error) {
+    console.error('Erro ao criar exercício:', error);
     res.status(400).json({ error: "Erro ao criar exercício." });
   }
 };
@@ -35,16 +45,25 @@ export const getExercisesByWorkout = async (req, res) => {
 // 📌 Atualizar um exercício (sets, nome, etc.)
 export const updateExercise = async (req, res) => {
   const { id } = req.params;
-  const { name, sets } = req.body;
+  const { name, sets, reps, targetWeight } = req.body;
 
   try {
+    console.log('Atualizando exercício:', { id, name, sets, reps, targetWeight });
+    
     const updatedExercise = await prisma.exercise.update({
       where: { id: parseInt(id) },
-      data: { name, sets },
+      data: { 
+        name, 
+        sets, 
+        reps: reps ? parseInt(reps) : undefined,
+        targetWeight: targetWeight ? parseFloat(targetWeight) : null
+      },
     });
 
+    console.log('Exercício atualizado:', updatedExercise);
     res.json(updatedExercise);
   } catch (error) {
+    console.error('Erro ao atualizar exercício:', error);
     res.status(400).json({ error: "Erro ao atualizar exercício." });
   }
 };

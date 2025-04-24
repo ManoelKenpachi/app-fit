@@ -7,34 +7,67 @@ export const createWorkout = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    console.log('=== INÍCIO DA CRIAÇÃO DE TREINO ===');
+    console.log('Dados recebidos:', { name, day, exercises, userId });
+
+    // Validações básicas
+    if (!name || !day || !exercises || !Array.isArray(exercises)) {
+      console.log('Dados inválidos:', { name, day, exercises });
+      return res.status(400).json({ 
+        error: "Dados inválidos. Nome, dia e exercícios são obrigatórios." 
+      });
+    }
+
+    // Validar cada exercício
+    for (const exercise of exercises) {
+      if (!exercise.name || !exercise.sets || !exercise.reps) {
+        console.log('Exercício inválido:', exercise);
+        return res.status(400).json({ 
+          error: "Dados inválidos. Cada exercício deve ter nome, séries e repetições." 
+        });
+      }
+    }
+
+    // Criar novo treino
+    console.log('Criando novo treino');
+    const workoutData = {
+      name,
+      day,
+      userId,
+      exercises: {
+        create: exercises.map(exercise => ({
+          name: exercise.name,
+          sets: parseInt(exercise.sets),
+          reps: parseInt(exercise.reps),
+          targetWeight: exercise.targetWeight ? parseFloat(exercise.targetWeight) : null,
+          weight: 0
+        }))
+      }
+    };
+
+    console.log('Dados preparados para criação:', workoutData);
+
     const workout = await prisma.workout.create({
-      data: {
-        name,
-        day,
-        userId,
-        exercises: {
-          create: exercises.map(exercise => ({
-            name: exercise.name,
-            sets: parseInt(exercise.sets),
-            reps: parseInt(exercise.reps),
-            targetWeight: exercise.targetWeight ? parseFloat(exercise.targetWeight) : 0
-          }))
-        }
-      },
+      data: workoutData,
       include: {
         exercises: true
       }
     });
 
-    const workoutWithExercises = await prisma.workout.findUnique({
-      where: { id: workout.id },
-      include: { exercises: true }
-    });
-
-    res.json(workoutWithExercises);
+    console.log('Treino criado com sucesso:', workout);
+    console.log('=== FIM DA CRIAÇÃO DE TREINO ===');
+    res.json(workout);
   } catch (error) {
-    console.error("Erro ao criar treino:", error);
-    res.status(400).json({ error: "Erro ao criar treino." });
+    console.error("Erro detalhado ao criar treino:", {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: "Erro ao criar treino.",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -43,15 +76,10 @@ export const getWorkouts = async (req, res) => {
     const userId = req.user.id;
     const workouts = await prisma.workout.findMany({
       where: {
-        userId: userId,
-        isActive: true
+        userId: userId
       },
       include: {
-        exercises: {
-          where: {
-            isActive: true
-          }
-        }
+        exercises: true
       }
     });
     res.json(workouts);
@@ -124,23 +152,18 @@ export const getWorkoutOfTheDay = async (req, res) => {
     const workout = await prisma.workout.findFirst({
       where: {
         userId: userId,
-        day: currentDay,
-        isActive: true
+        day: currentDay
       },
       include: {
-        exercises: {
-          where: {
-            isActive: true
-          }
-        }
+        exercises: true
       }
     });
 
     console.log('Treino encontrado:', workout);
     res.json(workout);
   } catch (error) {
-    console.error('Erro ao buscar treino do dia:', error);
-    res.status(500).json({ error: 'Erro ao buscar treino do dia' });
+    console.error('Erro ao buscar treinos do dia:', error);
+    res.status(500).json({ error: 'Erro ao buscar treinos do dia' });
   }
 };
 
@@ -205,42 +228,80 @@ export const updateWorkout = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    console.log('Atualizando treino:', { id, name, day, exercises });
+
+    // Verifica se o treino existe e pertence ao usuário
     const existingWorkout = await prisma.workout.findUnique({
       where: { id: parseInt(id) },
+      include: { exercises: true }
     });
 
     if (!existingWorkout || existingWorkout.userId !== userId) {
       return res.status(403).json({ error: "Não autorizado a atualizar este treino." });
     }
 
-    await prisma.exercise.deleteMany({
-      where: { workoutId: parseInt(id) }
-    });
-
+    // Atualiza apenas os dados básicos do treino
     const updatedWorkout = await prisma.workout.update({
       where: { id: parseInt(id) },
       data: {
-        name,
-        day,
-        exercises: {
-          create: exercises.map(exercise => ({
-            name: exercise.name,
-            sets: parseInt(exercise.sets),
-            reps: parseInt(exercise.reps),
-            targetWeight: exercise.targetWeight ? parseFloat(exercise.targetWeight) : 0
-          }))
-        }
+        name: name || existingWorkout.name,
+        day: day || existingWorkout.day,
+      },
+      include: {
+        exercises: true
       }
     });
 
-    const workoutWithExercises = await prisma.workout.findUnique({
-      where: { id: updatedWorkout.id },
+    console.log('Treino atualizado com sucesso:', updatedWorkout);
+    res.json(updatedWorkout);
+  } catch (error) {
+    console.error("Erro ao atualizar treino:", error);
+    res.status(400).json({ 
+      error: "Erro ao atualizar treino.",
+      details: error.message 
+    });
+  }
+};
+
+// Adicionar novo exercício a um treino existente
+export const addExerciseToWorkout = async (req, res) => {
+  const { workoutId } = req.params;
+  const { name, sets, reps, targetWeight } = req.body;
+  const userId = req.user.id;
+
+  try {
+    // Verificar se o treino existe e pertence ao usuário
+    const workout = await prisma.workout.findUnique({
+      where: { id: parseInt(workoutId) },
       include: { exercises: true }
     });
 
-    res.json(workoutWithExercises);
+    if (!workout) {
+      return res.status(404).json({ error: "Treino não encontrado" });
+    }
+
+    if (workout.userId !== userId) {
+      return res.status(403).json({ error: "Não autorizado" });
+    }
+
+    // Adicionar novo exercício
+    const exercise = await prisma.exercise.create({
+      data: {
+        name,
+        sets: parseInt(sets),
+        reps: parseInt(reps),
+        targetWeight: targetWeight ? parseFloat(targetWeight) : null,
+        weight: 0,
+        workoutId: parseInt(workoutId)
+      }
+    });
+
+    res.json(exercise);
   } catch (error) {
-    console.error("Erro ao atualizar treino:", error);
-    res.status(400).json({ error: "Erro ao atualizar treino." });
+    console.error("Erro ao adicionar exercício:", error);
+    res.status(500).json({ 
+      error: "Erro ao adicionar exercício",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };

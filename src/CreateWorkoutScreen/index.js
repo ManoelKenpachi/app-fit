@@ -52,6 +52,8 @@ const CreateWorkoutScreen = ({ route }) => {
   const [sets, setSets] = useState('');
   const [reps, setReps] = useState('');
   const [targetWeight, setTargetWeight] = useState('');
+  const [selectedDay, setSelectedDay] = useState('');
+  const [editingWorkout, setEditingWorkout] = useState(null);
 
   const fetchWorkoutsForDay = async (day) => {
     try {
@@ -75,6 +77,7 @@ const CreateWorkoutScreen = ({ route }) => {
 
   useEffect(() => {
     fetchWorkoutsForDay(workoutDay);
+    console.log('useEffect executado - dia:', workoutDay);
   }, [workoutDay]);
 
   const handleDaySelect = (day) => {
@@ -109,36 +112,64 @@ const CreateWorkoutScreen = ({ route }) => {
   };
 
   const handleSaveWorkout = async () => {
-    if (!workoutName || !workoutDay || exercises.length === 0) {
-      Alert.alert('Erro', 'Por favor, preencha o nome do treino, selecione um dia e adicione pelo menos um exercício');
+    if (!workoutName.trim()) {
+      Alert.alert('Erro', 'Por favor, insira um nome para o treino');
       return;
     }
 
+    if (!workoutDay) {
+      Alert.alert('Erro', 'Por favor, selecione um dia para o treino');
+      return;
+    }
+
+    if (exercises.length === 0) {
+      Alert.alert('Erro', 'Por favor, adicione pelo menos um exercício');
+      return;
+    }
+
+    const workoutData = {
+      name: workoutName,
+      day: workoutDay,
+      exercises: exercises.map(exercise => ({
+        name: exercise.name,
+        sets: parseInt(exercise.sets),
+        reps: parseInt(exercise.reps),
+        targetWeight: exercise.targetWeight ? parseFloat(exercise.targetWeight) : 0
+      }))
+    };
+
     try {
-      const workoutData = {
-        name: workoutName,
-        day: workoutDay,
-        exercises: exercises.map(exercise => ({
-          name: exercise.name,
-          sets: parseInt(exercise.sets),
-          reps: parseInt(exercise.reps),
-          targetWeight: parseFloat(exercise.targetWeight) || 0
-        }))
+      setLoading(true);
+
+      const saveWorkout = async () => {
+        if (workoutToEdit) {
+          return await api.put(`/api/workouts/${workoutToEdit.id}`, workoutData);
+        }
+        return await api.post('/api/workouts', workoutData);
       };
 
-      if (workoutToEdit) {
-        await api.put(`/api/workouts/${workoutToEdit.id}`, workoutData);
-        Alert.alert('Sucesso', 'Treino atualizado com sucesso!');
-      } else {
-        await api.post('/api/workouts', workoutData);
-        Alert.alert('Sucesso', 'Treino criado com sucesso!');
-      }
+      await saveWorkout();
 
-      await fetchWorkoutsForDay(workoutDay);
-      navigation.goBack();
+      Alert.alert(
+        'Sucesso',
+        workoutToEdit ? 'Treino atualizado com sucesso!' : 'Treino criado com sucesso!',
+        [{ 
+          text: 'OK',
+          onPress: () => {
+            setLoading(false);
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'WorkoutScreen' }],
+            });
+          }
+        }]
+      );
     } catch (error) {
-      console.error('Erro ao salvar treino:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o treino. Tente novamente.');
+      setLoading(false);
+      Alert.alert(
+        'Erro',
+        'Não foi possível salvar o treino. Tente novamente.'
+      );
     }
   };
 
@@ -179,6 +210,24 @@ const CreateWorkoutScreen = ({ route }) => {
   // Adiciona uma ref para o ScrollView
   const scrollViewRef = React.useRef(null);
 
+  const handleSelectWorkout = async (workout) => {
+    console.log('handleSelectWorkout chamado para:', workout.name);
+    try {
+      console.log('Salvando treino selecionado:', workout.id);
+      await AsyncStorage.setItem(`selectedWorkout_${workoutDay}`, workout.id.toString());
+      console.log('Treino salvo com sucesso, navegando para WorkoutScreen');
+      
+      // Navegação direta para WorkoutScreen com o treino selecionado
+      navigation.navigate('WorkoutScreen', { 
+        selectedWorkoutId: workout.id,
+        workoutName: workout.name,
+        workoutDay: workoutDay
+      });
+    } catch (error) {
+      console.error('Erro ao selecionar treino:', error);
+    }
+  };
+
   const renderExistingWorkouts = () => {
     if (loading) {
       return (
@@ -201,6 +250,20 @@ const CreateWorkoutScreen = ({ route }) => {
         <View style={styles.workoutHeader}>
           <Text style={styles.existingWorkoutName}>{workout.name}</Text>
           <View style={styles.workoutActions}>
+            <TouchableOpacity
+              onPress={() => {
+                console.log('Botão Selecionar pressionado para treino:', workout);
+                handleSelectWorkout(workout);
+              }}
+              style={[
+                styles.actionButton,
+                styles.selectButton,
+                { backgroundColor: '#4CAF50', padding: 8, borderRadius: 5 }
+              ]}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
+              <Text style={[styles.selectButtonText, { color: '#FFFFFF', marginLeft: 5 }]}>Selecionar</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleEditWorkout(workout)}
               style={styles.actionButton}
@@ -239,7 +302,10 @@ const CreateWorkoutScreen = ({ route }) => {
       <ScrollView 
         ref={scrollViewRef}
         style={styles.content}
-        contentContainerStyle={styles.scrollViewContent}
+        contentContainerStyle={[
+          styles.scrollViewContent,
+          { paddingBottom: 80 }
+        ]}
       >
         <TextInput
           style={styles.input}
@@ -263,35 +329,31 @@ const CreateWorkoutScreen = ({ route }) => {
           {renderExistingWorkouts()}
         </View>
 
-        <View style={styles.exercisesHeader}>
-          <Text style={styles.exercisesTitle}>Novo Treino - Exercícios</Text>
-          <TouchableOpacity 
-            style={styles.addExerciseButton}
-            onPress={() => setShowExerciseModal(true)}
-          >
-            <Ionicons name="add" size={24} color="#BB86FC" />
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.exercisesTitle}>EXERCÍCIOS</Text>
+        
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setShowExerciseModal(true)}
+        >
+          <Text style={styles.addButtonText}>Adicionar Exercício</Text>
+        </TouchableOpacity>
 
         {exercises.map((exercise, index) => (
-          <View key={index} style={styles.exerciseItem}>
-            <View style={styles.exerciseInfo}>
-              <Text style={styles.exerciseName}>{exercise.name}</Text>
+          <React.Fragment key={index}>
+            <View style={styles.exerciseCard}>
+              <View style={styles.exerciseHeader}>
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                <TouchableOpacity onPress={() => handleRemoveExercise(index)}>
+                  <Ionicons name="trash-outline" size={24} color="#BB86FC" />
+                </TouchableOpacity>
+              </View>
               <Text style={styles.exerciseDetails}>
-                {exercise.sets} séries x {exercise.reps} reps
-                {exercise.targetWeight > 0 ? ` • ${exercise.targetWeight}kg` : ''}
+                {exercise.sets} séries x {exercise.reps} repetições
+                {exercise.targetWeight ? ` • Meta: ${exercise.targetWeight}kg` : ''}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => {
-                const newExercises = exercises.filter((_, i) => i !== index);
-                setExercises(newExercises);
-              }}
-            >
-              <Ionicons name="trash" size={24} color="#FF6B6B" />
-            </TouchableOpacity>
-          </View>
+            {index < exercises.length - 1 && <View style={styles.exercisesDivider} />}
+          </React.Fragment>
         ))}
       </ScrollView>
 

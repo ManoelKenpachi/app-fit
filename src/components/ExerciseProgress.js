@@ -26,29 +26,43 @@ const ExerciseProgress = ({ exercise, onComplete }) => {
   const loadLastWeight = async () => {
     try {
       const response = await api.get(`/api/progress/${exercise.id}/last-weight`);
-      if (response.data && response.data.weight) {
+      if (response.data && response.data.weight !== undefined) {
         const lastWeight = response.data.weight.toString();
         setTargetWeight(lastWeight);
         if (!weight || weight === '0') {
           setWeight(lastWeight);
         }
+      } else if (exercise.targetWeight) {
+        setWeight(exercise.targetWeight.toString());
+        setTargetWeight(exercise.targetWeight.toString());
       }
     } catch (error) {
       console.error('Erro ao carregar última carga:', error);
+      if (exercise.targetWeight) {
+        setWeight(exercise.targetWeight.toString());
+        setTargetWeight(exercise.targetWeight.toString());
+      }
     }
   };
 
   const loadProgress = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/progress/${exercise.id}`);
+      const response = await api.get(`/api/progress/${exercise.id}/list`);
       setProgress(response.data);
-      if (response.data.length < exercise.sets) {
-        setCurrentSet(response.data.length + 1);
-        if (response.data.length > 0) {
-          const lastProgress = response.data[response.data.length - 1];
-          setWeight(lastProgress.weight.toString());
-        }
+      
+      // Atualiza o currentSet baseado no progresso
+      if (response.data.length >= exercise.sets) {
+        setCurrentSet(exercise.sets + 1); // Todas as séries completadas
+      } else {
+        setCurrentSet(response.data.length + 1); // Próxima série
+      }
+
+      // Atualiza o peso baseado no último progresso
+      if (response.data.length > 0) {
+        const lastProgress = response.data[response.data.length - 1];
+        const weightValue = lastProgress.weight;
+        setWeight(weightValue > 0 ? weightValue.toString() : '');
       }
     } catch (error) {
       console.error('Erro ao carregar progresso:', error);
@@ -59,45 +73,77 @@ const ExerciseProgress = ({ exercise, onComplete }) => {
   };
 
   const handleSetComplete = async () => {
-    if (!weight) {
-      Alert.alert('Erro', 'Por favor, preencha o peso');
+    let weightValue = weight ? parseFloat(weight) : 0;
+    if (isNaN(weightValue) || weightValue < 0) {
+      Alert.alert('Erro', 'O peso deve ser um número válido maior ou igual a 0');
       return;
     }
 
     const repsToSubmit = reps || exercise.reps;
-
+    if (!repsToSubmit || parseInt(repsToSubmit) <= 0) {
+      Alert.alert('Erro', 'Por favor, insira um número válido de repetições');
+      return;
+    }
+    
     try {
       setLoading(true);
-      const response = await api.post(`/api/progress/${exercise.id}`, {
-        weight: parseFloat(weight),
+      
+      const progressData = {
+        weight: weightValue,
         reps: parseInt(repsToSubmit),
         set: currentSet
-      });
+      };
 
-      if (response.data && response.data.progress) {
-        const updatedProgress = [...progress, response.data.progress];
-        setProgress(updatedProgress);
+      console.log('Enviando dados:', progressData);
+      
+      const response = await api.post(`/api/progress/${exercise.id}`, progressData);
 
+      console.log('Resposta da API:', response.data);
+
+      if (response.data) {
+        // Atualiza a lista de progresso
+        if (response.data.progress) {
+          setProgress(prev => [...prev, response.data.progress]);
+        }
+
+        // Mostra mensagem de sucesso se houver
         if (response.data.message) {
           Alert.alert('Sucesso', response.data.message);
         }
 
+        // Atualiza peso sugerido se houver
         if (response.data.suggestedWeight) {
-          setTargetWeight(response.data.suggestedWeight.toString());
+          const newWeight = response.data.suggestedWeight.toString();
+          setTargetWeight(newWeight);
+          setWeight(newWeight);
         }
 
+        // Verifica se completou todas as séries
         if (response.data.isCompleted) {
+          Alert.alert('Parabéns!', 'Você completou todas as séries deste exercício!');
           if (onComplete) {
             onComplete();
           }
-        } else if (currentSet < exercise.sets) {
-          setCurrentSet(currentSet + 1);
-          setReps(exercise.reps ? exercise.reps.toString() : '');
+        } else {
+          // Prepara para próxima série
+          if (currentSet < exercise.sets) {
+            setCurrentSet(prev => prev + 1);
+            setReps(exercise.reps ? exercise.reps.toString() : '');
+          }
         }
+
+        // Recarrega o progresso para garantir sincronização
+        await loadProgress();
       }
     } catch (error) {
       console.error('Erro ao registrar progresso:', error);
-      Alert.alert('Erro', 'Não foi possível registrar o progresso');
+      let errorMessage = 'Não foi possível registrar o progresso. Tente novamente.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      Alert.alert('Erro', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,15 +156,19 @@ const ExerciseProgress = ({ exercise, onComplete }) => {
   };
 
   const handleUpdateSet = async (progressId) => {
-    if (!weight) {
-      Alert.alert('Erro', 'Por favor, preencha o peso');
-      return;
+    let weightValue = 0;
+    if (weight && weight.trim() !== '') {
+      weightValue = parseFloat(weight);
+      if (isNaN(weightValue) || weightValue < 0) {
+        Alert.alert('Erro', 'Se informado, o peso deve ser um número válido maior ou igual a 0');
+        return;
+      }
     }
 
     try {
       setLoading(true);
       const response = await api.put(`/api/progress/${progressId}`, {
-        weight: parseFloat(weight),
+        weight: weightValue,
         reps: parseInt(reps || exercise.reps)
       });
 
@@ -147,14 +197,14 @@ const ExerciseProgress = ({ exercise, onComplete }) => {
       <Text style={styles.exerciseName}>{exercise.name}</Text>
       <View style={styles.headerInfo}>
         <Text style={styles.setInfo}>
-          {currentSet <= exercise.sets ? `Série ${currentSet} de ${exercise.sets}` : 'Séries Completadas'}
+          {currentSet <= exercise.sets ? `Série ${currentSet} de ${exercise.sets}` : `Série Extra ${currentSet - exercise.sets}`}
         </Text>
         {targetWeight && (
           <Text style={styles.targetWeight}>Meta: {targetWeight}kg x {exercise.reps} reps</Text>
         )}
       </View>
 
-      {currentSet <= exercise.sets && (
+      {(currentSet <= exercise.sets || progress.length >= exercise.sets) && (
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
             <Text style={styles.label}>Peso (kg)</Text>
@@ -184,7 +234,7 @@ const ExerciseProgress = ({ exercise, onComplete }) => {
         </View>
       )}
 
-      {currentSet <= exercise.sets && (
+      {(currentSet <= exercise.sets || progress.length >= exercise.sets) && (
         <TouchableOpacity 
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleSetComplete}
@@ -252,18 +302,6 @@ const ExerciseProgress = ({ exercise, onComplete }) => {
           </View>
         ))}
       </View>
-
-      {progress.length >= exercise.sets && (
-        <TouchableOpacity 
-          style={[styles.addSetButton, loading && styles.buttonDisabled]}
-          onPress={() => {
-            setCurrentSet(progress.length + 1);
-          }}
-          disabled={loading}
-        >
-          <Text style={styles.addSetButtonText}>+ Adicionar Série Extra</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 };
@@ -272,37 +310,56 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     backgroundColor: '#121212',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    flex: 1
   },
   exerciseName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 8,
+    textAlign: 'center'
   },
   headerInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 4
   },
   setInfo: {
     fontSize: 18,
     color: '#BB86FC',
+    flex: 1,
+    minWidth: 150,
+    textAlign: 'left'
   },
   targetWeight: {
     fontSize: 16,
     color: '#03DAC6',
+    flex: 1,
+    textAlign: 'right'
   },
   inputContainer: {
     marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 12
   },
   inputWrapper: {
-    marginBottom: 12,
+    flex: 1,
+    minWidth: 140,
+    marginBottom: 12
   },
   label: {
     fontSize: 16,
     color: '#fff',
-    marginBottom: 4,
+    marginBottom: 4
   },
   input: {
     backgroundColor: '#2C2C2C',
@@ -312,6 +369,8 @@ const styles = StyleSheet.create({
     padding: 12,
     color: '#fff',
     fontSize: 16,
+    width: '100%',
+    minHeight: 48
   },
   button: {
     backgroundColor: '#BB86FC',
@@ -319,22 +378,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 24,
+    minHeight: 52,
+    justifyContent: 'center'
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.7
   },
   buttonText: {
     color: '#000',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   },
   progressContainer: {
     marginTop: 16,
+    flex: 1
   },
   progressTitle: {
     fontSize: 18,
     color: '#fff',
     marginBottom: 12,
+    textAlign: 'center'
   },
   progressRow: {
     flexDirection: 'row',
@@ -344,19 +407,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#2C2C2C',
     padding: 12,
     borderRadius: 8,
+    flexWrap: 'wrap',
+    gap: 8
   },
   progressText: {
     fontSize: 16,
     color: '#fff',
     flex: 1,
+    minWidth: 200
   },
   completedSet: {
-    color: '#03DAC6',
+    color: '#03DAC6'
   },
   editInputContainer: {
     flex: 1,
     flexDirection: 'row',
     marginRight: 8,
+    gap: 8,
+    flexWrap: 'wrap'
   },
   editInput: {
     flex: 1,
@@ -367,6 +435,8 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 8,
     color: '#fff',
+    minWidth: 80,
+    minHeight: 40
   },
   editButton: {
     backgroundColor: '#2C2C2C',
@@ -375,25 +445,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     borderColor: '#BB86FC',
+    minHeight: 40,
+    justifyContent: 'center'
   },
   editButtonText: {
     color: '#BB86FC',
-    fontSize: 14,
-  },
-  addSetButton: {
-    backgroundColor: '#2C2C2C',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#BB86FC',
-  },
-  addSetButtonText: {
-    color: '#BB86FC',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+    fontSize: 14
+  }
 });
 
 export default ExerciseProgress; 

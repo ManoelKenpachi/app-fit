@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import ExerciseProgress from "../components/ExerciseProgress";
 
-const WorkoutScreen = () => {
+const WorkoutScreen = ({ route }) => {
   const navigation = useNavigation();
   const { logout } = useContext(AuthContext);
   const [workout, setWorkout] = useState(null);
@@ -25,8 +25,48 @@ const WorkoutScreen = () => {
         return;
       }
 
-      const response = await api.get("/api/workouts/workout-today");
-      setWorkout(response.data);
+      const today = new Date();
+      const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+      const currentDay = weekdays[today.getDay()];
+      
+      // Primeiro busca todos os treinos do dia
+      const allWorkouts = await api.get("/api/workouts");
+      const todaysWorkouts = allWorkouts.data.filter(w => w.day === currentDay);
+      
+      if (todaysWorkouts.length === 0) {
+        setWorkout(null);
+        return;
+      }
+
+      // Se recebeu um novo ID de treino selecionado via navegação
+      if (route.params?.selectedWorkoutId) {
+        const selectedWorkout = todaysWorkouts.find(w => w.id === route.params.selectedWorkoutId);
+        if (selectedWorkout) {
+          setWorkout(selectedWorkout);
+          // Salva o ID do treino selecionado
+          await AsyncStorage.setItem(`selectedWorkout_${currentDay}`, selectedWorkout.id.toString());
+        }
+        // Limpa o parâmetro da rota após usar
+        navigation.setParams({ selectedWorkoutId: undefined });
+      } else {
+        // Tenta pegar o ID do treino selecionado para o dia atual
+        const selectedWorkoutId = await AsyncStorage.getItem(`selectedWorkout_${currentDay}`);
+        
+        if (selectedWorkoutId) {
+          const selectedWorkout = todaysWorkouts.find(w => w.id === parseInt(selectedWorkoutId));
+          if (selectedWorkout) {
+            setWorkout(selectedWorkout);
+          } else {
+            // Se não encontrar o treino selecionado, usa o primeiro da lista
+            setWorkout(todaysWorkouts[0]);
+            await AsyncStorage.setItem(`selectedWorkout_${currentDay}`, todaysWorkouts[0].id.toString());
+          }
+        } else {
+          // Se não houver treino selecionado, usa o primeiro da lista
+          setWorkout(todaysWorkouts[0]);
+          await AsyncStorage.setItem(`selectedWorkout_${currentDay}`, todaysWorkouts[0].id.toString());
+        }
+      }
     } catch (error) {
       console.error("❌ Erro ao buscar treino:", error.response ? error.response.data : error.message);
       Alert.alert("Erro", "Não foi possível carregar o treino. Tente novamente.");
@@ -39,7 +79,7 @@ const WorkoutScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       fetchWorkout();
-    }, [])
+    }, [route.params?.selectedWorkoutId])
   );
 
   const onRefresh = React.useCallback(() => {
@@ -49,12 +89,6 @@ const WorkoutScreen = () => {
 
   const handleAddWorkout = () => {
     navigation.navigate('CreateWorkout');
-  };
-
-  const handleEditWorkout = () => {
-    if (workout && workout.id) {
-      navigation.navigate('CreateWorkout', { workoutToEdit: workout });
-    }
   };
 
   const handleLogout = async () => {
@@ -106,8 +140,14 @@ const WorkoutScreen = () => {
       <View style={styles.container}>
         {renderHeader()}
         <View style={styles.emptyContainer}>
-          <Text style={styles.noWorkoutText}>Nenhum treino programado para hoje</Text>
-          <Text style={styles.emptySubtitle}>Clique no + para adicionar um treino</Text>
+          <Text style={styles.noWorkoutText}>Nenhum treino encontrado para hoje</Text>
+          <TouchableOpacity 
+            style={styles.addWorkoutButton}
+            onPress={() => navigation.navigate('CreateWorkout')}
+          >
+            <Ionicons name="add-circle-outline" size={48} color="#BB86FC" />
+            <Text style={styles.addWorkoutText}>Adicionar Treino</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -125,14 +165,6 @@ const WorkoutScreen = () => {
         <View style={styles.content}>
           <View style={styles.workoutHeader}>
             <Text style={styles.workoutName}>{workout.name}</Text>
-            {workout.id && (
-              <TouchableOpacity 
-                style={styles.editButton}
-                onPress={handleEditWorkout}
-              >
-                <Ionicons name="create-outline" size={24} color="#BB86FC" />
-              </TouchableOpacity>
-            )}
           </View>
 
           {!showProgress ? (
