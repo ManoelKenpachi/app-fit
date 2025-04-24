@@ -1,0 +1,5 @@
+# Configuração da API
+API_URL=http://localhost:4000
+
+# Outras configurações
+APP_ENV=development 

@@ -2,13 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config/config.js';
 import { errorHandler } from './middlewares/errorHandler.js';
-
-// Importação das rotas
+import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import workoutRoutes from './routes/workoutRoutes.js';
 import exerciseRoutes from './routes/exerciseRoutes.js';
 import progressRoutes from './routes/progressRoutes.js';
+import { PrismaClient } from '@prisma/client';
 
+dotenv.config();
+const prisma = new PrismaClient();
 const app = express();
 
 // Middlewares globais
@@ -42,8 +44,15 @@ app.all('*', (req, res, next) => {
 // Middleware de tratamento de erros
 app.use(errorHandler);
 
-// Inicialização do servidor
-app.listen(config.port, () => {
-  console.log(`🚀 Servidor rodando no modo ${config.env}`);
-  console.log(`🔥 Servidor rodando na porta ${config.port}`);
+// Rota de teste
+app.get('/', (req, res) => {
+  res.json({ message: 'API funcionando!' });
+});
+
+// Iniciar o servidor
+const PORT = 4000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando no modo ${config.nodeEnv}`);
+  console.log(`🔥 Servidor rodando na porta ${PORT}`);
 });

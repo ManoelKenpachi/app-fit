@@ -8,27 +8,53 @@ datasource db {
 }
 
 model User {
-  id       Int       @id @default(autoincrement())
-  name     String
-  email    String    @unique
-  password String
-  workouts Workout[]
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  workouts  Workout[]
+  Progress  Progress[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Workout {
-  id        Int        @id @default(autoincrement())
-  name      String
-  day       String?
-  userId    Int
-  user      User       @relation(fields: [userId], references: [id])
-  exercises Exercise[]
+  id          Int        @id @default(autoincrement())
+  name        String
+  day         String
+  description String?
+  userId      Int
+  user        User       @relation(fields: [userId], references: [id])
+  exercises   Exercise[]
+  Progress    Progress[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 model Exercise {
-  id        Int       @id @default(autoincrement())
-  name      String
-  sets      Int
-  reps      Int?
-  workoutId Int
-  workout   Workout   @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  id          Int        @id @default(autoincrement())
+  name        String
+  sets        Int
+  reps        Int
+  weight      Float      @default(0)
+  targetWeight Float?
+  workoutId   Int
+  workout     Workout    @relation(fields: [workoutId], references: [id])
+  progress    Progress[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Progress {
+  id         Int      @id @default(autoincrement())
+  exerciseId Int
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  workoutId  Int
+  workout    Workout  @relation(fields: [workoutId], references: [id])
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  weight     Float
+  reps       Int
+  set        Int
+  date       DateTime @default(now())
 }

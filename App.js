@@ -21,21 +21,23 @@ export default function App() {
             headerTintColor: '#BB86FC',
             headerTitleStyle: {
               fontWeight: 'bold',
-            },
-            headerShown: false
+            }
           }}
         >
           <Stack.Screen 
             name="LoginScreen" 
-            component={LoginScreen} 
+            component={LoginScreen}
+            options={{ title: 'Login' }}
           />
           <Stack.Screen 
             name="WorkoutScreen" 
-            component={WorkoutScreen} 
+            component={WorkoutScreen}
+            options={{ title: 'Meus Treinos' }}
           />
           <Stack.Screen 
             name="CreateWorkout" 
-            component={CreateWorkoutScreen} 
+            component={CreateWorkoutScreen}
+            options={{ title: 'Criar Treino' }}
           />
         </Stack.Navigator>
       </NavigationContainer>
